@@ -1,9 +1,12 @@
 
-import React, { createContext, useContext, useState, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import { User as SupabaseUser, Session } from '@supabase/supabase-js';
+import { supabase } from '@/integrations/supabase/client';
 import { User } from '@/types';
 
 interface AuthContextType {
   user: User | null;
+  session: Session | null;
   login: (credentials: { identifier: string; password: string }) => Promise<boolean>;
   logout: () => void;
   isLoading: boolean;
@@ -11,48 +14,78 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Mock users for demonstration
-const mockUsers: User[] = [
-  { id: '1', name: 'Admin User', role: 'admin' },
-  { id: '2', name: 'สมชาย ใจดี', role: 'client', clientId: 'client1' },
-  { id: '3', name: 'John Smith', role: 'client', clientId: 'client2' }
-];
-
 export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
+  const [session, setSession] = useState<Session | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    // Set up auth state listener
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (event, session) => {
+        setSession(session);
+        
+        if (session?.user) {
+          // Fetch user profile from our profiles table
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('*')
+            .eq('id', session.user.id)
+            .single();
+          
+          if (profile) {
+            setUser({
+              id: profile.id,
+              name: profile.name,
+              role: profile.role as 'client' | 'admin',
+              clientId: profile.client_id
+            });
+          }
+        } else {
+          setUser(null);
+        }
+        
+        setIsLoading(false);
+      }
+    );
+
+    // Check for existing session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+      if (!session) {
+        setIsLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
 
   const login = async (credentials: { identifier: string; password: string }): Promise<boolean> => {
     setIsLoading(true);
     
-    // Mock authentication - in real app, this would be API call
-    await new Promise(resolve => setTimeout(resolve, 1000));
+    // Try to sign in with email
+    const { data, error } = await supabase.auth.signInWithPassword({
+      email: credentials.identifier,
+      password: credentials.password,
+    });
     
-    // Simple mock logic
-    if (credentials.identifier === 'admin' && credentials.password === 'admin') {
-      setUser(mockUsers[0]);
+    if (error) {
+      console.error('Login error:', error);
       setIsLoading(false);
-      return true;
-    } else if (credentials.identifier === '1234567890123' && credentials.password === 'client1') {
-      setUser(mockUsers[1]);
-      setIsLoading(false);
-      return true;
-    } else if (credentials.identifier === 'john@email.com' && credentials.password === 'client2') {
-      setUser(mockUsers[2]);
-      setIsLoading(false);
-      return true;
+      return false;
     }
     
-    setIsLoading(false);
-    return false;
+    return true;
   };
 
-  const logout = () => {
+  const logout = async () => {
+    await supabase.auth.signOut();
     setUser(null);
+    setSession(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout, isLoading }}>
+    <AuthContext.Provider value={{ user, session, login, logout, isLoading }}>
       {children}
     </AuthContext.Provider>
   );
