@@ -1,25 +1,26 @@
-
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useLanguage } from '@/contexts/LanguageContext';
 import { LanguageToggle } from './LanguageToggle';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-
 interface LayoutProps {
   children: React.ReactNode;
 }
-
-export function Layout({ children }: LayoutProps) {
-  const { user, logout } = useAuth();
-  const { t } = useLanguage();
-
+export function Layout({
+  children
+}: LayoutProps) {
+  const {
+    user,
+    logout
+  } = useAuth();
+  const {
+    t
+  } = useLanguage();
   if (!user) {
     return <>{children}</>;
   }
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
+  return <div className="min-h-screen bg-gradient-to-br from-amber-50 via-orange-50 to-yellow-50">
       {/* Header */}
       <header className="bg-white/80 backdrop-blur-sm border-b border-amber-200 sticky top-0 z-50">
         <div className="container mx-auto px-4 py-4">
@@ -48,6 +49,5 @@ export function Layout({ children }: LayoutProps) {
       <main className="container mx-auto px-4 py-8">
         {children}
       </main>
-    </div>
-  );
+    </div>;
 }
